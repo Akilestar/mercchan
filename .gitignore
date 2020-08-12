@@ -1,5 +1,7 @@
 # Discord Token
 .env
+node_modules/
+jspm_packages/
 
 # Logs
 logs
@@ -39,10 +41,6 @@ bower_components
 
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
-
-# Dependency directories
-node_modules/
-jspm_packages/
 
 # TypeScript v1 declaration files
 typings/
@@ -105,3 +103,9 @@ dist
 
 # TernJS port file
 .tern-port
+
+# FFMPEG Windows Files
+ffmpeg/
+
+# Firebase
+firebaseServiceAccount.json

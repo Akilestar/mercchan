@@ -1,70 +1,62 @@
-const Discord = require('discord.js');
-const config = require('./config.json');
+const { CommandoClient } = require('discord.js-commando');
+const { MessageEmbed, Structures } = require('discord.js');
 require('dotenv').config();
-const client = new Discord.Client({ disableEveryone: true });
+const path = require('path');
 const fs = require('fs');
-client.commands = new Discord.Collection();
-require('./util/eventLoader.js')(client);
+const botToken = process.env.DISCORDTOKEN;
+const owner = process.env.OWNER;
 
-// Reads all commands and boots them in
-fs.readdir('./commands/', (err, files) => {
-  if (err) console.log(err);
-  let jsfile = files.filter((f) => f.split('.').pop() === 'js');
-  if (jsfile.length <= 0) {
-    console.log("Couldn't find commands.");
-    return;
+Structures.extend('Guild', function (Guild) {
+  class MercsGuild extends Guild {
+    constructor(client, data) {
+      super(client, data);
+      this.musicData = {
+        queue: [],
+        isPlaying: false,
+        nowPlaying: null,
+        songDispatcher: null,
+        volume: 1,
+      };
+    }
   }
-
-  jsfile.forEach((files, i) => {
-    let props = require(`./commands/${files}`);
-    console.log(`${files} has been loaded.`);
-    client.commands.set(props.help.name, props);
-  });
+  return MercsGuild;
 });
 
-// Voice Channel assign Role
-client.on('voiceStateUpdate', (oldMember, newMember) => {
-  let oldUserChannel = oldMember.voiceChannel;
-  let newUserChannel = newMember.voiceChannel;
-  const member = newMember.user.username;
-  const title = newMember.highestRole.name
-  const channel = client.guilds
-    .get('300763347312181248')
-    .channels.get('731692862323818538');
-  //This is wanting to play notifications
-  if (
-    newUserChannel.name === '👋 Wanting To Play 👋' &&
-    oldUserChannel !== '👋 Wanting To Play 👋'
-  ) {
-    let embed = new Discord.RichEmbed()
-      .setTitle(`${title} ${member} Joined Wanting To Play`)
-      .setColor(newMember.colorRole.hexColor)
-      .setThumbnail(newMember.user.avatarURL);
-    channel.send(embed).catch((err) => console.log(err));
-  }
-  if (oldUserChannel === undefined && newUserChannel !== undefined) {
-    console.log('User Joins a voice channel');
-  } else if (newUserChannel === undefined) {
-    console.log('User leaves a voice channel');
-  }
+const mercchan = new CommandoClient({
+  commandPrefix: '!',
+  owner: owner,
 });
 
-// Message Guild Event
-client.on('message', (message) => {
-  if (message.author.bot) return;
-  if (message.channel.type === 'dm') return;
+mercchan.registry
+  .registerDefaultTypes()
+  .registerGroups([
+    ['admin', 'Admin Commands'],
+    ['music', 'Music Commands'],
+    ['games', 'Games'],
+    ['events', 'Server Events'],
+    ['other', 'Other Commands'],
+    ['utilities', 'Utilities'],
+    ['rpg', 'Role Playing'],
+  ])
+  .registerDefaultGroups()
+  .registerDefaultCommands({
+    eval: false,
+  })
+  .registerCommandsIn(path.join(__dirname, 'commands'));
 
-  let prefix = config.prefix;
-  let messageArray = message.content.split(' ');
-  let cmd = messageArray[0];
-  let args = messageArray.slice(1);
+const eventFiles = fs
+  .readdirSync('./events')
+  .filter((files) => files.endsWith('.js'));
 
-  if (!cmd.startsWith(prefix)) return;
-  let commandfile = client.commands.get(cmd.slice(prefix.length));
-  if (commandfile) commandfile.run(client, message, args);
-});
+for (const event of eventFiles) {
+  const events = require(`./events/${event}`);
+  const eventsName = event.split('.')[0];
+  if (eventsName === 'ready') {
+    mercchan.once(eventsName, events.bind(null, mercchan));
+  } else {
+    mercchan.on(eventsName, events.bind(null, mercchan));
+    console.log(`Loaded Event: ${eventsName}`);
+  }
+}
 
-client
-  .login(process.env.DISCORDTOKEN)
-  .then(console.log('Logged In'))
-  .catch((err) => console.log(err));
+mercchan.login(botToken);
